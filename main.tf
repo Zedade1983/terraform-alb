@@ -1,3 +1,4 @@
+##main.tf
 terraform {
   required_providers {
     aws = {
@@ -13,71 +14,97 @@ provider "aws" {
 }
 
 # Create a VPC
-resource "aws_vpc" "my-vpc" {
+resource "aws_vpc" "szd-vpc" {
   cidr_block = "10.0.0.0/16"
   tags = {
-    Name = "Demo VPC"
+    Name = "Project VPC"
   }
 }
 
+# Create AWS Security Group
+resource "aws_security_group" "webserver-sg" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.szd-vpc.id
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = [aws_vpc.szd-vpc.cidr_block]
+    
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "webserver_sg"
+  }
+}
 # Create Web Public Subnet
 resource "aws_subnet" "web-subnet-1" {
-  vpc_id                  = aws_vpc.my-vpc.id
+  vpc_id                  = aws_vpc.szd-vpc.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "Web-1a"
+    Name = "Web-publ-subnet1"
   }
 }
 
 resource "aws_subnet" "web-subnet-2" {
-  vpc_id                  = aws_vpc.my-vpc.id
+  vpc_id                  = aws_vpc.szd-vpc.id
   cidr_block              = "10.0.2.0/24"
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "Web-2b"
+    Name = "Web-publ-subnet2"
   }
 }
 
 # Create Application Public Subnet
 resource "aws_subnet" "application-subnet-1" {
-  vpc_id                  = aws_vpc.my-vpc.id
+  vpc_id                  = aws_vpc.szd-vpc.id
   cidr_block              = "10.0.11.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = false
 
   tags = {
-    Name = "Application-1a"
+    Name = "Application-subnet1"
   }
 }
 
 resource "aws_subnet" "application-subnet-2" {
-  vpc_id                  = aws_vpc.my-vpc.id
+  vpc_id                  = aws_vpc.szd-vpc.id
   cidr_block              = "10.0.12.0/24"
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = false
 
   tags = {
-    Name = "Application-2b"
+    Name = "Application-subnet2"
   }
 }
 
 # Create Internet Gateway
 resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.my-vpc.id
+  vpc_id = aws_vpc.szd-vpc.id
 
   tags = {
-    Name = "Demo IGW"
+    Name = "Project_IGW"
   }
 }
 
-# Create Web layber route table
+# Create Web layer route table
 resource "aws_route_table" "web-rt" {
-  vpc_id = aws_vpc.my-vpc.id
+  vpc_id = aws_vpc.szd-vpc.id
 
 
   route {
@@ -101,7 +128,7 @@ resource "aws_route_table_association" "b" {
   route_table_id = aws_route_table.web-rt.id
 }
 
-#Create EC2 Instance
+#Create EC2 Instances
 resource "aws_instance" "webserver1" {
   ami                    = "ami-0d5eff06f840b45e9"
   instance_type          = "t2.micro"
@@ -111,7 +138,7 @@ resource "aws_instance" "webserver1" {
   user_data              = file("install_apache.sh")
 
   tags = {
-    Name = "Web Server"
+    Name = "Webserver1"
   }
 
 }
@@ -125,7 +152,7 @@ resource "aws_instance" "webserver2" {
   user_data              = file("install_apache.sh")
 
   tags = {
-    Name = "Web Server"
+    Name = "Webserver2"
   }
 
 }
@@ -134,7 +161,7 @@ resource "aws_instance" "webserver2" {
 resource "aws_security_group" "web-sg" {
   name        = "Web-SG"
   description = "Allow HTTP inbound traffic"
-  vpc_id      = aws_vpc.my-vpc.id
+  vpc_id      = aws_vpc.szd-vpc.id
 
   ingress {
     description = "HTTP from VPC"
@@ -157,10 +184,10 @@ resource "aws_security_group" "web-sg" {
 }
 
 # Create Application Security Group
-resource "aws_security_group" "webserver-sg" {
-  name        = "Webserver-SG"
+resource "aws_security_group" "application-sg" {
+  name        = "application-SG"
   description = "Allow inbound traffic from ALB"
-  vpc_id      = aws_vpc.my-vpc.id
+  vpc_id      = aws_vpc.szd-vpc.id
 
   ingress {
     description     = "Allow traffic from web layer"
@@ -178,7 +205,7 @@ resource "aws_security_group" "webserver-sg" {
   }
 
   tags = {
-    Name = "Webserver-SG"
+    Name = "Application-SG"
   }
 }
 
@@ -194,7 +221,7 @@ resource "aws_lb_target_group" "external-elb" {
   name     = "ALB-TG"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = aws_vpc.my-vpc.id
+  vpc_id   = aws_vpc.szd-vpc.id
 }
 
 resource "aws_lb_target_group_attachment" "external-elb1" {
